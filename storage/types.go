@@ -39,6 +39,14 @@ func bytesForBits(numBits int) int {
 
 // NewEmptyNodeID creates a new zero-length NodeID with sufficient underlying
 // capacity to store a maximum of maxLenBits.
+func NewNodeIDFromHash(h trillian.Hash) NodeID {
+	return NodeID{
+		Path:          h,
+		PathLenBits:   len(h) * 8,
+		PrefixLenBits: len(h) * 8,
+	}
+}
+
 func NewEmptyNodeID(maxLenBits int) NodeID {
 	return NodeID{
 		Path:          make([]byte, bytesForBits(maxLenBits)),
@@ -119,4 +127,9 @@ func (n *NodeID) Siblings() []NodeID {
 		bi++
 	}
 	return r
+}
+
+// Equivalent return true iff the other represents the same path prefix as this NodeID.
+func (n *NodeID) Equivalent(other NodeID) bool {
+	return n.String() == other.String()
 }

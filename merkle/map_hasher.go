@@ -6,6 +6,7 @@ import (
 
 type MapHasher struct {
 	TreeHasher
+	keyHasher  trillian.Hasher
 	nullHashes []trillian.Hash
 }
 
@@ -13,6 +14,7 @@ func NewMapHasher(hasher trillian.Hasher) MapHasher {
 	th := NewTreeHasher(hasher)
 	return MapHasher{
 		TreeHasher: th,
+		keyHasher:  hasher,
 		nullHashes: createNullHashes(th),
 	}
 }

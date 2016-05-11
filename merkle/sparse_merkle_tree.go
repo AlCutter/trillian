@@ -9,7 +9,8 @@ import (
 )
 
 type SparseMerkleTreeReader struct {
-	tx storage.ReadOnlyTreeTX
+	tx     storage.ReadOnlyTreeTX
+	hasher MapHasher
 }
 
 type SparseMerkleTreeWriter struct {
@@ -24,7 +25,7 @@ var (
 )
 
 func (s SparseMerkleTreeReader) RootAtRevision(rev int64) (trillian.Hash, error) {
-	nodes, err := s.tx.GetMerkleNodes([]storage.NodeID{storage.NewEmptyNodeID(256)}, rev)
+	nodes, err := s.tx.GetMerkleNodes(rev, []storage.NodeID{storage.NewEmptyNodeID(256)})
 	if err != nil {
 		return nil, err
 	}
@@ -38,12 +39,27 @@ func (s SparseMerkleTreeReader) RootAtRevision(rev int64) (trillian.Hash, error)
 }
 
 func (s SparseMerkleTreeReader) InclusionProof(rev int64, key trillian.Key) ([]trillian.Hash, error) {
-	return nil, errors.New("unimplemented")
+	kh := s.hasher.keyHasher.Hash(key)
+	nid := storage.NewNodeIDFromHash(kh)
+	sibs := nid.Siblings()
+	nodes, err := s.tx.GetMerkleNodes(rev, sibs)
+	if err != nil {
+		return nil, err
+	}
+	r := make([]trillian.Hash, len(sibs), len(sibs))
+	for i := 0; i < len(r); i++ {
+		if !sibs[i].Equivalent(nodes[i].NodeID) {
+			panic(fmt.Errorf("expected node ID %v, but got %v", sibs[i].String(), nodes[i].NodeID.String()))
+		}
+		r[i] = nodes[i].Hash
+	}
+	return r, nil
 }
 
 func NewSparseMerkleTreeReader(h MapHasher, tx storage.ReadOnlyTreeTX) *SparseMerkleTreeReader {
 	return &SparseMerkleTreeReader{
-		tx: tx,
+		tx:     tx,
+		hasher: h,
 	}
 }
 

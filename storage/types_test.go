@@ -116,3 +116,57 @@ func TestSiblings(t *testing.T) {
 		}
 	}
 }
+
+func TestNodeSelfEquivalent(t *testing.T) {
+	l := 16
+	n1 := NewNodeIDWithPrefix(0x1234, l, l, l)
+	if !n1.Equivalent(n1) {
+		t.Fatalf("%v not Equivalent to itself", n1)
+	}
+}
+
+func TestNodeEquivalent(t *testing.T) {
+	l := 16
+	n1 := NewNodeIDWithPrefix(0x1234, l, l, l)
+	n2 := NewNodeIDWithPrefix(0x1234, l, l, l)
+	if !n1.Equivalent(n2) {
+		t.Fatalf("%v not Equivalent with %v", n1, n2)
+	}
+}
+
+func TestNodeNotEquivalentPrefixLen(t *testing.T) {
+	l := 16
+	n1 := NewNodeIDWithPrefix(0x1234, l, l, l)
+	n2 := NewNodeIDWithPrefix(0x1234, l-1, l, l)
+	if n1.Equivalent(n2) {
+		t.Fatalf("%v incorrecly Equivalent with %v", n1, n2)
+	}
+}
+
+func TestNodeNotEquivalentIDLen(t *testing.T) {
+	l := 16
+	n1 := NewNodeIDWithPrefix(0x1234, l, l, l)
+	n2 := NewNodeIDWithPrefix(0x1234, l, l+1, l)
+	if n1.Equivalent(n2) {
+		t.Fatalf("%v incorrecly Equivalent with %v", n1, n2)
+	}
+}
+
+func TestNodeNotEquivalentMaxLen(t *testing.T) {
+	l := 16
+	n1 := NewNodeIDWithPrefix(0x1234, l, l, l)
+	// Different max len, but that's ok because the prefixes are identical
+	n2 := NewNodeIDWithPrefix(0x1234, l, l, l*2)
+	if !n1.Equivalent(n2) {
+		t.Fatalf("%v not Equivalent with %v", n1, n2)
+	}
+}
+
+func TestNodeNotEquivalentDifferentPrefix(t *testing.T) {
+	l := 16
+	n1 := NewNodeIDWithPrefix(0x1234, l, l, l)
+	n2 := NewNodeIDWithPrefix(0x5432, l, l, l)
+	if n1.Equivalent(n2) {
+		t.Fatalf("%v incorrecly Equivalent with %v", n1, n2)
+	}
+}
