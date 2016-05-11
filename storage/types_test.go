@@ -79,8 +79,40 @@ func TestString(t *testing.T) {
 	}
 
 	n = NewNodeIDWithPrefix(0x345678, 24, 32, 32)
-	t.Logf("Node: %#v", n)
 	if got, want := n.String(), "00110100010101100111100000000000"; got != want {
 		t.Fatalf("Expected '%s', got '%s'", want, got)
+	}
+}
+
+func TestSiblings(t *testing.T) {
+	l := 16
+	n := NewNodeIDWithPrefix(0xabe4, l, l, l)
+	expected := []string{
+		"1010101111100101",
+		"101010111110011",
+		"10101011111000",
+		"1010101111101",
+		"101010111111",
+		"10101011110",
+		"1010101110",
+		"101010110",
+		"10101010",
+		"1010100",
+		"101011",
+		"10100",
+		"1011",
+		"100",
+		"11",
+		"0"}
+
+	sibs := n.Siblings()
+	if got, want := len(sibs), len(expected); got != want {
+		t.Fatalf("Expected %d siblings, got %d", want, got)
+	}
+
+	for i := 0; i < len(sibs); i++ {
+		if want, got := expected[i], sibs[i].String(); want != got {
+			t.Fatalf("Expected sib %d to be %v, got %v", i, want, got)
+		}
 	}
 }
