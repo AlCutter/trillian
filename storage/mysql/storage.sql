@@ -63,9 +63,10 @@ CREATE TABLE IF NOT EXISTS Node(
   PRIMARY KEY(TreeId, NodeId, NodeRevision),
   FOREIGN KEY(TreeId) REFERENCES Trees(TreeId) ON DELETE CASCADE
 );
+--CREATE INDEX NodeRevision ON Node (TreeId, NodeRevision DESC);
 
-// The TreeRevisionIdx is used to enforce that there is only one STH at any
-// tree revision
+-- The TreeRevisionIdx is used to enforce that there is only one STH at any
+-- tree revision
 CREATE TABLE IF NOT EXISTS TreeHead(
   TreeId               INTEGER NOT NULL,
   TreeHeadTimestamp    BIGINT,
