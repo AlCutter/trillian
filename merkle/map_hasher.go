@@ -2,13 +2,15 @@ package merkle
 
 import (
 	"github.com/google/trillian"
+
+	_ "github.com/go-sql-driver/mysql"
 )
 
 // MapHasher is a specialised TreeHasher which also knows about the set of
 // "null" hashes for the unused sections of a SparseMerkleTree.
 type MapHasher struct {
 	TreeHasher
-	keyHasher  keyHashFunc
+	HashKey    keyHashFunc
 	nullHashes []trillian.Hash
 }
 
@@ -16,7 +18,7 @@ type MapHasher struct {
 func NewMapHasher(th TreeHasher) MapHasher {
 	return MapHasher{
 		TreeHasher: th,
-		keyHasher:  keyHasher(th.Hasher),
+		HashKey:    keyHasher(th.Hasher),
 		nullHashes: createNullHashes(th),
 	}
 }

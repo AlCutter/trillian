@@ -137,7 +137,18 @@ func (n *NodeID) Siblings() []NodeID {
 }
 
 func (n *NodeID) AsProto() *NodeIDProto {
-	return &NodeIDProto{Path: n.Path, PrefixLenBits: int32(n.PrefixLenBits)}
+	prefixBytes := n.PrefixLenBits / 8
+	prefixExtraBits := uint(n.PrefixLenBits % 8)
+	if prefixExtraBits > 0 {
+		prefixBytes++
+	}
+	p := make([]byte, prefixBytes)
+	copy(p, n.Path)
+	if prefixExtraBits > 0 {
+		p[prefixBytes-1] &= (1<<prefixExtraBits + 1) - 1
+	}
+
+	return &NodeIDProto{Path: p, PrefixLenBits: int32(n.PrefixLenBits)}
 }
 
 func NewNodeIDFromProto(p NodeIDProto) *NodeID {
