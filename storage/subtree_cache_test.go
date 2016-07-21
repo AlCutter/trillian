@@ -14,27 +14,31 @@ var splitTestVector = []struct {
 	outSuffix     []byte
 }{
 	{[]byte{0x12, 0x34, 0x56, 0x7f}, 32, []byte{0x12, 0x34, 0x56}, []byte{0x7f}},
-	{[]byte{0x12, 0x34, 0x56, 0x7f}, 25, []byte{0x12, 0x34, 0x56}, []byte{0x01}},
 	{[]byte{0x12, 0x34, 0x56, 0x79}, 29, []byte{0x12, 0x34, 0x56}, []byte{0x19}},
+	{[]byte{0x12, 0x34, 0x56, 0x7f}, 25, []byte{0x12, 0x34, 0x56}, []byte{0x01}},
 	{[]byte{0x12, 0x34, 0x56, 0x78}, 16, []byte{0x12}, []byte{0x34}},
+	{[]byte{0x12, 0x34, 0x56, 0x78}, 9, []byte{0x12}, []byte{0x00}},
+	{[]byte{0x12, 0x34, 0x56, 0x78}, 8, []byte{}, []byte{0x12}},
+	{[]byte{0x12, 0x34, 0x56, 0x78}, 7, []byte{}, []byte{0x12}},
+	{[]byte{0x12, 0x34, 0x56, 0x78}, 0, []byte{}, []byte{}},
 }
 
 func TestSplitNodeID(t *testing.T) {
-	for _, v := range splitTestVector {
+	for i, v := range splitTestVector {
 		n := NewNodeIDFromHash(v.inPath)
 		n.PrefixLenBits = v.inPathLenBits
 
 		p, s := splitNodeID(n)
 		if expected, got := v.outPrefix, p; !bytes.Equal(expected, got) {
-			t.Fatalf("Expected prefix %v, got %v", expected, got)
+			t.Fatalf("(test %d) Expected prefix %v, got %v", i, expected, got)
 		}
 
 		if expected, got := v.inPathLenBits-len(v.outPrefix)*8, int(s.bits); expected != got {
-			t.Fatalf("Expected suffix num bits %d, got %d", expected, got)
+			t.Fatalf("(test %d) Expected suffix num bits %d, got %d", i, expected, got)
 		}
 
 		if expected, got := v.outSuffix, s.path; !bytes.Equal(expected, got) {
-			t.Fatalf("Expected suffix path of %v, got %v", expected, got)
+			t.Fatalf("(test %d) Expected suffix path of %v, got %v", i, expected, got)
 		}
 	}
 }
@@ -69,7 +73,9 @@ func TestCacheFillOnlyReadsSubtrees(t *testing.T) {
 				t.Logf("saw %v", n)
 			}
 			return r
-		})).Return(&SubtreeProto{}, nil)
+		})).Return(&SubtreeProto{
+			Prefix: e.Path,
+		}, nil)
 	}
 
 	for nodeID.PrefixLenBits > 0 {

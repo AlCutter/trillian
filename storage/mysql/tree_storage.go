@@ -136,15 +136,18 @@ func decodeNodeID(nodeIDBytes []byte) (*storage.NodeID, error) {
 }
 
 func encodeNodeID(n storage.NodeID) ([]byte, error) {
-	nodeIdProto := n.AsProto()
-	marshalledBytes, err := proto.Marshal(nodeIdProto)
+	return []byte(n.String()), nil
+	/*
+		nodeIdProto := n.AsProto()
+		marshalledBytes, err := proto.Marshal(nodeIdProto)
 
-	if err != nil {
-		glog.Warningf("Failed to encode nodeid: %s", err)
-		return nil, err
-	}
+		if err != nil {
+			glog.Warningf("Failed to encode nodeid: %s", err)
+			return nil, err
+		}
 
-	return marshalledBytes, nil
+		return marshalledBytes, nil
+	*/
 }
 
 // getStmt creates and caches sql.Stmt structs based on the passed in statement
@@ -250,11 +253,18 @@ func (t *treeTX) getSubtree(treeRevision int64, nodeID storage.NodeID) (*storage
 	if err := proto.Unmarshal(nodesRaw, &subtree); err != nil {
 		return nil, err
 	}
+	if subtree.Prefix == nil && nodeID.PrefixLenBits == 0 {
+		subtree.Prefix = []byte{}
+		glog.Warning("Fixed nil (but expected empty) Prefix in subtree")
+	}
 
 	return &subtree, nil
 }
 
 func (t *treeTX) storeSubtree(subtree *storage.SubtreeProto) error {
+	if subtree.Prefix == nil {
+		panic(fmt.Errorf("nil prefix on %v", subtree))
+	}
 	stx := t.tx.Stmt(t.ts.setSubtree)
 	defer stx.Close()
 
@@ -265,7 +275,7 @@ func (t *treeTX) storeSubtree(subtree *storage.SubtreeProto) error {
 
 	r, err := stx.Exec(t.ts.treeID, subtree.Prefix, subtreeBytes, t.writeRevision)
 	if err != nil {
-		glog.Warningf("Failed to set merkle subtree: %s", err)
+		glog.Warningf("Failed to set merkle subtree for prefix %v: %s", subtree.Prefix, err)
 		return err
 	}
 	_, err = r.RowsAffected()
@@ -327,6 +337,7 @@ func (t *treeTX) GetMerkleNodes(treeRevision int64, nodeIDs []storage.NodeID) ([
 				Hash:         h,
 				NodeRevision: rev,
 			})
+			//glog.Infof("read rev %d node %s", rev, nodeID.String())
 		}
 	}
 	return ret, nil
