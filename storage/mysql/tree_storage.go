@@ -350,6 +350,9 @@ func (t *treeTX) SetMerkleNodes(treeRevision int64, nodes []storage.Node) error 
 		return fmt.Errorf("tree revision inconsistency, previously wrote in this transaciton for revision %d, but attempting to write revision %d", t.writeRevision, treeRevision)
 	}
 	for _, n := range nodes {
+		if n.NodeID.PrefixLenBits < 10 {
+			//glog.Infof("store rev %d node %s", treeRevision, n.NodeID.String())
+		}
 		err := t.subtreeCache.SetNodeHash(n.NodeID, treeRevision, n.Hash)
 		if err != nil {
 			return err

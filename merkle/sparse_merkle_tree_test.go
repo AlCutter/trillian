@@ -474,7 +474,7 @@ func TestSparseMerkleTreeWriterFetchesMultipleLeaves(t *testing.T) {
 	testSparseTreeFetches(t, vec)
 }
 
-func TestSparseMerkleTreeWriterBigBatch(t *testing.T) {
+func DISABLEDTestSparseMerkleTreeWriterBigBatch(t *testing.T) {
 	defer maybeProfileCPU(t)()
 	const rev = 100
 	w, tx := getSparseMerkleTreeWriterWithMockTX(rev)
