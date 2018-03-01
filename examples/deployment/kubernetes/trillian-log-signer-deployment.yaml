@@ -24,11 +24,16 @@ spec:
         "--quota_system=noop",
         "--http_endpoint=0.0.0.0:8091",
         "--sequencer_guard_window=0s",
-        "--sequencer_interval=500ms",
+        "--sequencer_interval=1s",
         "--num_sequencers=1",
-        "--batch_size=2000",
+        "--batch_size=1",
+        "--cloudspanner_dequeue_bucket_fraction=0",
+        "--cloudspanner_num_channels=10",
+        "--cloudspanner_min_open_sessions=1000",
+        "--cloudspanner_write_sessions=1",
         "--force_master=true",
-        "--alsologtostderr"
+        "--alsologtostderr",
+        "--vmodule=sequencer=2,log_operation_manager=2,subtree_cache=2,log_storage=2",
         ]
         envFrom:
           - configMapRef:

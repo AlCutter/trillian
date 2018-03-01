@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"runtime/debug"
 	"sort"
 	"sync"
 	"time"
@@ -123,9 +124,12 @@ func (ls *logStorage) Snapshot(ctx context.Context) (storage.ReadOnlyLogTX, erro
 		staleness = spanner.StrongRead()
 	}
 
+	stx := ls.ts.client.ReadOnlyTransaction().WithTimestampBound(staleness)
+	glog.Infof("Started Snapshot %+v\nat%s", stx, string(debug.Stack()))
+
 	snapshotTX := &snapshotTX{
 		client: ls.ts.client,
-		stx:    ls.ts.client.ReadOnlyTransaction().WithTimestampBound(staleness),
+		stx:    stx,
 		ls:     ls,
 	}
 	return &readOnlyLogTX{snapshotTX}, nil
@@ -163,6 +167,8 @@ func (ls *logStorage) BeginForTree(ctx context.Context, treeID int64) (storage.L
 
 func (ls *logStorage) ReadWriteTransaction(ctx context.Context, tree *trillian.Tree, f storage.LogTXFunc) error {
 	_, err := ls.ts.client.ReadWriteTransaction(ctx, func(ctx context.Context, stx *spanner.ReadWriteTransaction) error {
+		glog.Infof("Started RWTX %+v", stx)
+		defer glog.Infof("Finished with RWTX %+v", stx)
 		tx, err := ls.begin(ctx, tree, false /* readonly */, stx)
 		if err != nil {
 			return err
@@ -176,7 +182,9 @@ func (ls *logStorage) ReadWriteTransaction(ctx context.Context, tree *trillian.T
 }
 
 func (ls *logStorage) SnapshotForTree(ctx context.Context, tree *trillian.Tree) (storage.ReadOnlyLogTreeTX, error) {
-	return ls.begin(ctx, tree, true /* readonly */, ls.ts.client.ReadOnlyTransaction())
+	stx := ls.ts.client.ReadOnlyTransaction()
+	glog.Infof("Started SnapshotTX %+v", stx)
+	return ls.begin(ctx, tree, true /* readonly */, stx)
 }
 
 func (ls *logStorage) QueueLeaves(ctx context.Context, tree *trillian.Tree, leaves []*trillian.LogLeaf, qTimestamp time.Time) ([]*trillian.QueuedLogLeaf, error) {
@@ -518,6 +526,7 @@ func genDequeueRowsAcrossBuckets(config *spannerpb.LogStorageConfig, treeID int6
 //
 // TODO(al): cutoff is currently ignored.
 func (tx *logTX) DequeueLeaves(ctx context.Context, limit int, cutoff time.Time) ([]*trillian.LogLeaf, error) {
+	glog.Infof("Dequeue with %+v", tx.stx)
 	if limit <= 0 {
 		return nil, fmt.Errorf("limit should be > 0, got %d", limit)
 	}
@@ -536,11 +545,18 @@ func (tx *logTX) DequeueLeaves(ctx context.Context, limit int, cutoff time.Time)
 		rows = genDequeueRowsOld(tx.getLogStorageConfig(), tx.treeID, now.Unix(), rand.Int31n(numByteValues))
 	}
 	ret := make([]*trillian.LogLeaf, 0, limit)
+	readOpts := &spanner.ReadOptions{Limit: limit}
+	drain := 0
 	for _, rs := range rows {
-		rows := tx.stx.Read(ctx, unseqTable, rs, []string{colBucket, colQueueTimestampNanos, colMerkleLeafHash, colLeafIdentityHash})
+		glog.Infof("Dequeue scan: %s", rs)
+		rows := tx.stx.ReadWithOptions(ctx, unseqTable, rs, []string{colBucket, colQueueTimestampNanos, colMerkleLeafHash, colLeafIdentityHash}, readOpts)
 		if err := rows.Do(func(r *spanner.Row) error {
 			if len(ret) >= limit {
-				return errFinished
+				// try draining
+				drain++
+
+				return nil
+				//return errFinished
 			}
 			var l trillian.LogLeaf
 			var qe QueuedEntry
@@ -562,6 +578,9 @@ func (tx *logTX) DequeueLeaves(ctx context.Context, limit int, cutoff time.Time)
 			ret = append(ret, &l)
 			qe.leaf = &l
 			tx.dequeued[k] = &qe
+			if readOpts.Limit > 0 {
+				readOpts.Limit--
+			}
 			return nil
 		}); err != nil && err != errFinished {
 			return nil, err
@@ -572,22 +591,26 @@ func (tx *logTX) DequeueLeaves(ctx context.Context, limit int, cutoff time.Time)
 			break
 		}
 	}
+	glog.Infof("Drained %d", drain)
 	return ret, nil
 }
 
 // UpdateSequencedLeaves stores the sequence numbers assigned to the leaves,
 // and integrates them into the tree.
 func (tx *logTX) UpdateSequencedLeaves(ctx context.Context, leaves []*trillian.LogLeaf) error {
+	glog.Infof("Update  with %+v", tx.stx)
 	stx, ok := tx.stx.(*spanner.ReadWriteTransaction)
 	if !ok {
 		return ErrWrongTXType
 	}
+	glog.Infof("asserted with %+v", stx)
 	// We need the latest root to know what the next sequence number to use below is.
 	currentSTH, err := tx.currentSTH(ctx)
 	if err != nil {
 		return err
 	}
 
+	mutations := make([]*spanner.Mutation, 0, len(leaves)*2)
 	for _, l := range leaves {
 		if got, want := l.LeafIndex, currentSTH.TreeSize+tx.numSequenced; got != want {
 			return fmt.Errorf("attempting to assign non-sequential leaf with sequence %d, want %d", got, want)
@@ -604,19 +627,19 @@ func (tx *logTX) UpdateSequencedLeaves(ctx context.Context, leaves []*trillian.L
 		}
 
 		// Add the sequence mapping...
-		m1 := spanner.Insert(seqDataTbl,
+		mutations = append(mutations, spanner.Insert(seqDataTbl,
 			[]string{colTreeID, colSequenceNumber, colLeafIdentityHash, colMerkleLeafHash, colIntegrateTimestampNanos},
-			[]interface{}{tx.treeID, l.LeafIndex, l.LeafIdentityHash, l.MerkleLeafHash, iTimestamp.UnixNano()})
+			[]interface{}{tx.treeID, l.LeafIndex, l.LeafIdentityHash, l.MerkleLeafHash, iTimestamp.UnixNano()}))
 
-		m2 := spanner.Delete(unseqTable, spanner.Key{tx.treeID, qe.bucket, qe.timestamp, l.MerkleLeafHash})
+		key := spanner.Key{tx.treeID, qe.bucket, qe.timestamp, l.MerkleLeafHash}
+
+		mutations = append(mutations, spanner.Delete(unseqTable, key))
+		glog.Infof("Deleting %v", key)
 
 		tx.numSequenced++
-		if err := stx.BufferWrite([]*spanner.Mutation{m1, m2}); err != nil {
-			return fmt.Errorf("bufferwrite(): %v", err)
-		}
 	}
 
-	return nil
+	return stx.BufferWrite(mutations)
 }
 
 // GetSequencedLeafCount returns the number of leaves integrated into the tree

@@ -95,6 +95,7 @@ type spanRead interface {
 	Read(ctx context.Context, table string, keys spanner.KeySet, columns []string) *spanner.RowIterator
 	ReadUsingIndex(ctx context.Context, table, index string, keys spanner.KeySet, columns []string) *spanner.RowIterator
 	ReadRow(ctx context.Context, table string, key spanner.Key, columns []string) (*spanner.Row, error)
+	ReadWithOptions(ctx context.Context, table string, keys spanner.KeySet, columns []string, opts *spanner.ReadOptions) (ri *spanner.RowIterator)
 }
 
 // latestSTH reads and returns the newest STH.
@@ -102,7 +103,7 @@ func (t *treeStorage) latestSTH(ctx context.Context, stx spanRead, treeID int64)
 	query := spanner.NewStatement(
 		"SELECT t.TreeID, t.TimestampNanos, t.TreeSize, t.RootHash, t.RootSignature, t.TreeRevision, t.TreeMetadata FROM TreeHeads t" +
 			"   WHERE t.TreeID = @tree_id" +
-			"   ORDER BY t.TimestampNanos DESC " +
+			"   ORDER BY t.TreeRevision DESC " +
 			"   LIMIT 1")
 	query.Params["tree_id"] = treeID
 
@@ -264,6 +265,7 @@ func (t *treeTX) flushSubtrees() error {
 // transaction MUST NOT be used.
 // On return from the call, this transaction will be in a closed state.
 func (t *treeTX) Commit() error {
+	glog.Infof("Commit on %+v", t.stx)
 	t.mu.Lock()
 	defer func() {
 		t.stx = nil
@@ -289,6 +291,7 @@ func (t *treeTX) Commit() error {
 // transaction.
 // On return from the call, this transaction will be in a closed state.
 func (t *treeTX) Rollback() error {
+	glog.Infof("Rollback on %+v", t.stx)
 	t.mu.Lock()
 	defer func() {
 		t.stx = nil
@@ -302,6 +305,7 @@ func (t *treeTX) Rollback() error {
 }
 
 func (t *treeTX) Close() error {
+	glog.Infof("Close on %+v", t.stx)
 	if t.IsOpen() {
 		if err := t.Rollback(); err != nil && err != ErrTransactionClosed {
 			glog.Warningf("Rollback error on Close(): %v", err)
@@ -497,11 +501,13 @@ type snapshotTX struct {
 }
 
 func (t *snapshotTX) Commit() error {
+	glog.Infof("Commit on snapsho %+v", t.stx)
 	// No work required to commit snapshot transactions
 	return t.Close()
 }
 
 func (t *snapshotTX) Rollback() error {
+	glog.Infof("Rollback on %+v", t.stx)
 	return t.Close()
 }
 
@@ -512,7 +518,7 @@ func (t *snapshotTX) Close() error {
 		return ErrTransactionClosed
 	}
 	if stx, ok := t.stx.(*spanner.ReadOnlyTransaction); ok {
-		glog.Infof("Closed log snapshot %p", stx)
+		glog.Infof("Closed log snapshot %+v", stx)
 		stx.Close()
 	}
 	t.stx = nil

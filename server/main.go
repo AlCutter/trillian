@@ -29,6 +29,8 @@ import (
 	"github.com/google/trillian/util"
 	"github.com/grpc-ecosystem/grpc-gateway/runtime"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.opencensus.io/exporter/stackdriver"
+	"go.opencensus.io/trace"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -83,6 +85,14 @@ type Main struct {
 // Run starts the configured server. Blocks until the server exits.
 func (m *Main) Run(ctx context.Context) error {
 	glog.CopyStandardLogTo("WARNING")
+
+	exporter, err := stackdriver.NewExporter(stackdriver.Options{ProjectID: "trillian-opensource-ci"})
+	if err != nil {
+		glog.Fatal(err)
+	}
+	// Export to Stackdriver Trace.
+	trace.RegisterExporter(exporter)
+	trace.SetDefaultSampler(trace.AlwaysSample())
 
 	srv, err := m.newGRPCServer()
 	if err != nil {

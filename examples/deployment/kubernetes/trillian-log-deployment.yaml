@@ -24,7 +24,8 @@ spec:
         "--quota_system=noop",
         "--rpc_endpoint=0.0.0.0:8090",
         "--http_endpoint=0.0.0.0:8091",
-        "--alsologtostderr"
+        "--alsologtostderr",
+        "--cloudspanner_readonly_staleness=5m",
         ]
         envFrom:
           - configMapRef:
