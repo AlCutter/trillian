@@ -15,8 +15,10 @@ go get github.com/google/trillian/...
 cd $GOPATH/src/github.com/google/trillian
 
 # Build docker images
-docker build -f examples/deployment/docker/log_server/Dockerfile -t gcr.io/$PROJECT_NAME/log_server:$TAG .
-docker build -f examples/deployment/docker/log_signer/Dockerfile -t gcr.io/$PROJECT_NAME/log_signer:$TAG .
+docker build -f examples/deployment/docker/log_server/Dockerfile -t us.gcr.io/$PROJECT_NAME/log_server:$TAG .
+docker build -f examples/deployment/docker/log_signer/Dockerfile -t us.gcr.io/$PROJECT_NAME/log_signer:$TAG .
+gcloud container images --quiet add-tag us.gcr.io/$PROJECT_NAME/log_server:$TAG us.gcr.io/${PROJECT_NAME}/log_server:latest
+gcloud container images --quiet add-tag us.gcr.io/$PROJECT_NAME/log_signer:$TAG us.gcr.io/${PROJECT_NAME}/log_signer:latest
 # TODO(al): when cloudspanner supports maps:
 # docker build -f examples/deployment/docker/map_server/Dockerfile -t us.gcr.io/$PROJECT_NAME/map_server:$TAG .
 
@@ -36,7 +38,7 @@ docker push "gcr.io/${PROJECT_NAME}/log_signer:${TAG}"
 
 # Prepare configmap:
 kubectl delete configmap deploy-config
-envsubst < examples/deployment/kubernetes/trillian-cloudspanner.yaml | kubectl create -f -
+envsubst < examples/deployment/kubernetes/trillian-mysql.yaml | kubectl create -f -
 
 # Launch with kubernetes
 envsubst < examples/deployment/kubernetes/trillian-log-deployment.yaml | kubectl apply -f -

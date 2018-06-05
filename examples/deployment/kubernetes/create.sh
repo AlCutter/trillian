@@ -35,6 +35,7 @@ for SERVICE in container spanner; do
 done
 
 # Create cluster & node pools
+#
 gcloud container clusters create "${CLUSTER_NAME}" --machine-type "n1-standard-1" --image-type "COS" --num-nodes "2" --enable-autorepair --enable-autoupgrade
 gcloud container node-pools create "logserver-pool" --machine-type "n1-standard-1" --image-type "COS" --num-nodes "4" --enable-autorepair --enable-autoupgrade
 gcloud container node-pools create "signer-pool" --machine-type "n1-standard-2" --image-type "COS" --num-nodes "1" --enable-autorepair --enable-autoupgrade
@@ -42,8 +43,8 @@ gcloud container node-pools create "ctfe-pool" --machine-type "n1-standard-1" --
 gcloud container clusters get-credentials "${CLUSTER_NAME}"
 
 # Create spanner instance & DB
-gcloud spanner instances create trillian-spanner --description "Trillian Spanner instance" --nodes=5 --config="regional-${REGION}"
-gcloud spanner databases create trillian-db --instance trillian-spanner --ddl="$(cat ${DIR}/../../../storage/cloudspanner/spanner.sdl | grep -v '^--.*$')"
+# gcloud spanner instances create trillian-spanner --description "Trillian Spanner instance" --nodes=5 --config="regional-${REGION}"
+# gcloud spanner databases create trillian-db --instance trillian-spanner --ddl="$(cat ${DIR}/../../../storage/cloudspanner/spanner.sdl | grep -v '^--.*$')"
 
 # Create service account
 gcloud iam service-accounts create trillian --display-name "Trillian service account"

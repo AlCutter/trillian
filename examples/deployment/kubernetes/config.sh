@@ -1,5 +1,5 @@
-export PROJECT_NAME=trillian-opensource-lowlatency
-export CLUSTER_NAME=trillian-opensource-lowlatency
+export PROJECT_NAME=trillian-far-away-places
+export CLUSTER_NAME=trillian-far-away-places
 export REGION=us-central1
-export ZONE=${REGION}-b
-export CONFIGMAP=trillian-cloudspanner.yaml
+export ZONE=${REGION}-c
+export CONFIGMAP=trillian-mysql.yaml
