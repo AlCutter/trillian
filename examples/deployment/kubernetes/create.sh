@@ -35,6 +35,7 @@ for SERVICE in container spanner; do
 done
 
 # Create cluster & node pools
+#
 gcloud container clusters create "${CLUSTER_NAME}" --machine-type "n1-standard-1" --image-type "COS" --num-nodes "2" --enable-autorepair --enable-autoupgrade
 gcloud container node-pools create "logserver-pool" --machine-type "n1-standard-1" --image-type "COS" --num-nodes "4" --enable-autorepair --enable-autoupgrade
 gcloud container node-pools create "signer-pool" --machine-type "n1-standard-2" --image-type "COS" --num-nodes "1" --enable-autorepair --enable-autoupgrade

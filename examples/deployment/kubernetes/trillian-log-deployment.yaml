@@ -35,7 +35,7 @@ spec:
         envFrom:
           - configMapRef:
               name: deploy-config
-        image: gcr.io/${PROJECT_NAME}/log_server:latest
+        image: us.gcr.io/${PROJECT_NAME}/log_server:latest
         imagePullPolicy: Always
         resources:
           limits:
@@ -58,7 +58,7 @@ spec:
         - name: google-cloud-key
           mountPath: /var/secrets/google
       - name: prometheus-to-sd
-        image: gcr.io/google-containers/prometheus-to-sd:v0.2.6
+        image: us.gcr.io/google-containers/prometheus-to-sd:v0.2.6
         ports:
           - name: profiler
             containerPort: 6060
