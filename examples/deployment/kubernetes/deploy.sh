@@ -49,9 +49,9 @@ fi
 echo "Building and pushing docker images: ${images}"
 for thing in ${images}; do
   echo "  - ${thing}"
-  docker build --quiet -f examples/deployment/docker/${thing}/Dockerfile -t gcr.io/$PROJECT_ID/${thing}:$IMAGE_TAG .
-  docker push gcr.io/${PROJECT_ID}/${thing}:${IMAGE_TAG}
-  gcloud --quiet container images add-tag gcr.io/${PROJECT_ID}/${thing}:${IMAGE_TAG} gcr.io/${PROJECT_ID}/${thing}:latest
+ # docker build --quiet -f examples/deployment/docker/${thing}/Dockerfile -t gcr.io/$PROJECT_ID/${thing}:$IMAGE_TAG .
+#  docker push gcr.io/${PROJECT_ID}/${thing}:${IMAGE_TAG}
+#  gcloud --quiet container images add-tag gcr.io/${PROJECT_ID}/${thing}:${IMAGE_TAG} gcr.io/${PROJECT_ID}/${thing}:latest
 done
 
 echo "Updating jobs..."
@@ -64,9 +64,17 @@ kubeconfigs="trillian-log-deployment.yaml trillian-log-service.yaml trillian-log
 if ${RUN_MAP}; then
   kubeconfigs+=" trillian-map-deployment.yaml trillian-map-service.yaml"
 fi
+
+extra_pods="/dev/null"
+if [ "${STORAGE}" == "cloudsql" ]; then
+  extra_pods="${DIR}/cloudsql-proxy-fragment.yaml"
+fi
 for thing in ${kubeconfigs}; do
   echo ${thing}
-  envsubst < ${DIR}/${thing} | kubectl apply -f -
+  cat ${DIR}/${thing} | sed "/@EXTRA_PODS@/{
+                              s/@EXTRA_PODS@//g
+                              r ${extra_pods}
+                            }" | envsubst | kubectl apply -f -
 done
 
 echo "Setting images..."

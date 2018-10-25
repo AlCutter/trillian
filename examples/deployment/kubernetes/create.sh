@@ -6,7 +6,9 @@
 set -e
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-source ${DIR}/config.sh
+if [ $# -eq 1 ]; then
+  source $1
+fi
 
 # Check required binaries are installed
 if ! gcloud --help > /dev/null; then
@@ -44,8 +46,17 @@ gcloud config set project "${PROJECT_ID}"
 gcloud config set compute/zone ${MASTER_ZONE}
 gcloud config set container/cluster "${CLUSTER_NAME}"
 
-# Ensure Kubernetes Engine (container) and Cloud Spanner (spanner) services are enabled
-for SERVICE in container spanner; do
+# Ensure Kubernetes Engine (container) and storage (spanner/cloudsql) services are enabled
+services="container"
+case "${STORAGE}" in
+  cloudspanner)
+    services+=" spanner"
+    ;;
+  cloudsql)
+    services+=" sql-component sqladmin"
+    ;;
+esac
+for SERVICE in ${services}; do
   gcloud services enable ${SERVICE}.googleapis.com --project=${PROJECT_ID}
 done
 
@@ -55,8 +66,24 @@ gcloud container clusters create "${CLUSTER_NAME}" --machine-type "${MACHINE_TYP
 gcloud container clusters get-credentials "${CLUSTER_NAME}"
 
 # Create spanner instance & DB
-gcloud spanner instances create trillian-spanner --description "Trillian Spanner instance" --nodes=1 --config="regional-${REGION}"
-gcloud spanner databases create trillian-db --instance trillian-spanner --ddl="$(cat ${DIR}/../../../storage/cloudspanner/spanner.sdl | grep -v '^--.*$')"
+case "${STORAGE}" in
+  cloudspanner)
+    gcloud spanner instances create trillian-spanner --description "Trillian Spanner instance" --nodes=1 --config="regional-${REGION}"
+    gcloud spanner databases create trillian-db --instance trillian-spanner --ddl="$(cat ${DIR}/../../../storage/cloudspanner/spanner.sdl | grep -v '^--.*$')"
+    ;;
+  cloudsql)
+    gcloud sql instances create trillian-cloudsql --tier=${STORAGE_MACHINE_TYPE} --region=${REGION}
+    # TODO(al): sort out passwords
+    gcloud sql users set-password root --host=% --instance=trillian-cloudsql --password=345safgq5rgedfvc
+    gcloud sql users create trillian-db-user --host=% --instance=trillian-cloudsql --password=4q8f9jvreuf
+    gcloud sql databases create trillian-db --instance trillian-cloudsql
+    kubectl create secret generic cloudsql-db-credentials \
+      --from-literal=username=trillian-db-user --from-literal=password=4q8f9jvreuf
+
+
+    #TODO(al): somehow create the schema instance in trillian-db
+    ;;
+esac
 
 # Create service account
 gcloud iam service-accounts create trillian --display-name "Trillian service account"
@@ -64,7 +91,7 @@ gcloud iam service-accounts create trillian --display-name "Trillian service acc
 gcloud iam service-accounts keys create /dev/stdout --iam-account="trillian@${PROJECT_ID}.iam.gserviceaccount.com" |
   kubectl create secret generic trillian-key --from-file=key.json=/dev/stdin
 # Update roles
-for ROLE in spanner.databaseUser logging.logWriter monitoring.metricWriter; do
+for ROLE in spanner.databaseUser cloudsql.client logging.logWriter monitoring.metricWriter; do
   gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
     --member "serviceAccount:trillian@${PROJECT_ID}.iam.gserviceaccount.com" \
     --role "roles/${ROLE}"
