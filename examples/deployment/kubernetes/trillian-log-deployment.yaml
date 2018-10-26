@@ -82,3 +82,4 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: metadata.namespace
+@EXTRA_PODS@

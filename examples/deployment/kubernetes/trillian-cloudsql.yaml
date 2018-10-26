@@ -5,7 +5,8 @@ metadata:
   namespace: default
 data:
   STORAGE_SYSTEM: mysql
-  STORAGE_FLAG: --mycql_uri=
+  STORAGE_INSTANCE: "${PROJECT_ID}:${REGION}:trillian-cloudsql"
+  STORAGE_FLAG: --mysql_uri=trillian-db-user:4q8f9jvreuf@tcp(127.0.0.1:3306)/trillian-db
   GOOGLE_APPLICATION_CREDENTIALS: /var/secrets/google/key.json
   SIGNER_DEQUEUE_BUCKET_FRACTION: "0.0078"
   SIGNER_BATCH_SIZE: "1800"
