@@ -81,7 +81,10 @@ case "${STORAGE}" in
       --from-literal=username=trillian-db-user --from-literal=password=4q8f9jvreuf
 
 
-    #TODO(al): somehow create the schema instance in trillian-db
+    go get github.com/GoogleCloudPlatform/cloudsql-proxy/cmd/cloud_sql_proxy
+    go run github.com/GoogleCloudPlatform/cloudsql-proxy/cmd/cloud_sql_proxy -instances ${PROJECT_ID}:${REGION}:trillian-cloudsql &
+    mysql mysql -u trillian-db-user -S /tmp/cloudsqlproxy/trillian-cloudsql-ci:us-east1:trillian-cloudsql -D trillian-db --password=4q8f9jvreuf < ${DIR}/../../../storage/mysql/storage.sql
+    kill %1
     ;;
 esac
 
