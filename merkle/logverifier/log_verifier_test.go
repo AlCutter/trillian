@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package logverifier
+package logverifier_test
 
 import (
 	"bytes"
@@ -23,6 +23,7 @@ import (
 
 	_ "github.com/golang/glog"
 	"github.com/google/trillian/internal/merkle/inmemory"
+	"github.com/google/trillian/merkle/logverifier"
 	"github.com/google/trillian/merkle/rfc6962"
 )
 
@@ -207,7 +208,7 @@ func corruptConsistencyProof(snapshot1, snapshot2 int64, root1, root2 []byte, pr
 	return ret
 }
 
-func verifierCheck(v *LogVerifier, leafIndex, treeSize int64, proof [][]byte, root, leafHash []byte) error {
+func verifierCheck(v *logverifier.LogVerifier, leafIndex, treeSize int64, proof [][]byte, root, leafHash []byte) error {
 	// Verify original inclusion proof.
 	got, err := v.RootFromInclusionProof(leafIndex, treeSize, proof, leafHash)
 	if err != nil {
@@ -233,7 +234,7 @@ func verifierCheck(v *LogVerifier, leafIndex, treeSize int64, proof [][]byte, ro
 	return nil
 }
 
-func verifierConsistencyCheck(v *LogVerifier, snapshot1, snapshot2 int64, root1, root2 []byte, proof [][]byte) error {
+func verifierConsistencyCheck(v *logverifier.LogVerifier, snapshot1, snapshot2 int64, root1, root2 []byte, proof [][]byte) error {
 	// Verify original consistency proof.
 	if err := v.VerifyConsistencyProof(snapshot1, snapshot2, root1, root2, proof); err != nil {
 		return err
@@ -258,10 +259,10 @@ func verifierConsistencyCheck(v *LogVerifier, snapshot1, snapshot2 int64, root1,
 }
 
 func TestVerifyInclusionProofSingleEntry(t *testing.T) {
-	v := New(rfc6962.DefaultHasher)
+	v := logverifier.New(rfc6962.DefaultHasher)
 	data := []byte("data")
 	// Root and leaf hash for 1-entry tree are the same.
-	hash := v.hasher.HashLeaf(data)
+	hash := rfc6962.DefaultHasher.HashLeaf(data)
 	// The corresponding inclusion proof is empty.
 	proof := [][]byte{}
 	emptyHash := []byte{}
@@ -286,7 +287,7 @@ func TestVerifyInclusionProofSingleEntry(t *testing.T) {
 }
 
 func TestVerifyInclusionProof(t *testing.T) {
-	v := New(rfc6962.DefaultHasher)
+	v := logverifier.New(rfc6962.DefaultHasher)
 	proof := [][]byte{}
 
 	probes := []struct {
@@ -341,7 +342,7 @@ func TestVerifyInclusionProofGenerated(t *testing.T) {
 }
 
 func TestVerifyConsistencyProof(t *testing.T) {
-	v := New(rfc6962.DefaultHasher)
+	v := logverifier.New(rfc6962.DefaultHasher)
 
 	root1 := []byte("don't care 1")
 	root2 := []byte("don't care 2")
@@ -511,10 +512,10 @@ func shortHash(hash []byte) string {
 	return fmt.Sprintf("%x...", hash[:4])
 }
 
-func createTree(size int64) (*inmemory.MerkleTree, LogVerifier) {
+func createTree(size int64) (*inmemory.MerkleTree, logverifier.LogVerifier) {
 	tree := inmemory.NewMerkleTree(rfc6962.DefaultHasher)
 	growTree(tree, size)
-	return tree, New(rfc6962.DefaultHasher)
+	return tree, logverifier.New(rfc6962.DefaultHasher)
 }
 
 func growTree(tree *inmemory.MerkleTree, upTo int64) {
