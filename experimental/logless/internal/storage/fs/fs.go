@@ -2,7 +2,6 @@ package fs
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -14,7 +13,8 @@ import (
 // FS is a logless storage implementation which uses files to store tree state.
 // The on-disk structure is:
 //  <rootDir>/leaves/xx/xx/xx/xx
-//  <rootDir>/leaves/pending/...
+//  <rootDir>/leaves/pending/
+//  <rootDir>/seq/xx/xx/xx/xx
 //  <rootDir>/tree/<level>/xx/xx
 //  <rootDir>/state
 type FS struct {
@@ -24,8 +24,9 @@ type FS struct {
 }
 
 const (
-	leavesPathFmt        = "%02x/%02x/%02x/%02x"
-	leavesPendingPathFmt = "pending/%032x"
+	leavesPathFmt        = "leaves/%02x/%02x/%02x/%02x"
+	leavesPendingPathFmt = "leaves/pending/%0x"
+	seqPathFmt           = "seq/%02x/%02x/%02x/%02x"
 	subtreePathFtm       = "tree/%02x/%02x/%02x"
 	statePath            = "state"
 )
@@ -64,7 +65,7 @@ func Create(rootDir string, emptyHash []byte) (*FS, error) {
 		return nil, fmt.Errorf("failed to create directory %q: %w", rootDir, err)
 	}
 
-	for _, sfx := range []string{"pending", "tree"} {
+	for _, sfx := range []string{"leaves/pending", "seq", "tree"} {
 		path := filepath.Join(rootDir, sfx)
 		if err := os.MkdirAll(path, 0755); err != nil {
 			return nil, fmt.Errorf("failed to create directory %q: %w", path, err)
@@ -96,9 +97,68 @@ func (fs *FS) LogState() api.LogState {
 	return fs.state
 }
 
-// Sequence assigns the given leafhash and entry to the next available sequence number.
-func (fs *FS) Sequence(leafHash []byte, leaf []byte) (uint64, error) {
-	return 0, errors.New("unimplemented")
+func seqPath(root string, seq uint64) (string, string) {
+	frag := []string{
+		root,
+		"seq",
+		fmt.Sprintf("%02x", (seq>>24)&0xff),
+		fmt.Sprintf("%02x", (seq>>16)&0xff),
+		fmt.Sprintf("%02x", (seq>>8)&0xff),
+		fmt.Sprintf("%02x", seq&0xff),
+	}
+	d := filepath.Join(frag[:4]...)
+	return d, frag[4]
+}
+
+func leafPath(root string, leafhash []byte) (string, string) {
+	frag := []string{
+		root,
+		"leaves",
+		fmt.Sprintf("%02x", leafhash[0]),
+		fmt.Sprintf("%02x", leafhash[1]),
+		fmt.Sprintf("%02x", leafhash[2]),
+		fmt.Sprintf("%02x", leafhash[3]),
+	}
+	d := filepath.Join(frag[:4]...)
+	return d, frag[4]
+}
+
+// Sequence assigns the given leaf entry to the next available sequence number.
+func (fs *FS) Sequence(leafhash []byte, leaf []byte) error {
+	// First store the entry in a temp file
+	tmp := filepath.Join(fs.rootDir, fmt.Sprintf(leavesPendingPathFmt, leafhash))
+	if err := ioutil.WriteFile(tmp, leaf, 0644); err != nil {
+		return fmt.Errorf("unable to write leafdata to temporary file: %w", err)
+	}
+	defer func() {
+		os.Remove(tmp)
+	}()
+
+	// Try to link into leaf data storage
+	leafDir, leafFile := leafPath(fs.rootDir, leafhash)
+	if err := os.MkdirAll(leafDir, 0755); err != nil {
+		return fmt.Errorf("failed to make leaf directory structure: %w", err)
+	}
+	if err := os.Link(tmp, filepath.Join(leafDir, leafFile)); err != nil && !os.IsExist(err) {
+		return fmt.Errorf("failed to link leafdata file: %w", err)
+	}
+
+	// Now try to sequence it
+	for {
+		seq := fs.nextSeq
+		fs.nextSeq++
+
+		seqDir, seqFile := seqPath(fs.rootDir, seq)
+		if err := os.MkdirAll(seqDir, 0755); err != nil {
+			return fmt.Errorf("failed to make seq directory structure: %w", err)
+		}
+		if err := os.Link(tmp, filepath.Join(seqDir, seqFile)); err != nil {
+			continue
+		}
+		break
+	}
+
+	return nil
 }
 
 func loadLogState(s string) (*api.LogState, error) {
