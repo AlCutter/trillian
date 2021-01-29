@@ -183,20 +183,21 @@ func (fs *FS) Sequence(leafhash []byte, leaf []byte) error {
 // ScanSequenced calls the provided function once for each contiguous entry
 // in storage starting at begin.
 // The scan will abort if the function returns an error.
-func (fs *FS) ScanSequenced(begin uint64, f func(seq uint64, entry []byte) error) error {
+func (fs *FS) ScanSequenced(begin uint64, f func(seq uint64, entry []byte) error) (uint64, error) {
+	end := begin
 	for {
-		sp := filepath.Join(seqPath(fs.rootDir, begin))
+		sp := filepath.Join(seqPath(fs.rootDir, end))
 		entry, err := ioutil.ReadFile(sp)
 		if os.IsNotExist(err) {
 			// we're done.
-			return nil
+			return end - begin, nil
 		} else if err != nil {
-			return fmt.Errorf("failed to read leafdata at index %d: %w", begin, err)
+			return end - begin, fmt.Errorf("failed to read leafdata at index %d: %w", begin, err)
 		}
-		if err := f(begin, entry); err != nil {
-			return err
+		if err := f(end, entry); err != nil {
+			return end - begin, err
 		}
-		begin++
+		end++
 	}
 }
 
