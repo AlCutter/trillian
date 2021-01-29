@@ -57,7 +57,7 @@ func Integrate(st LogStorage, h hashers.LogHasher) error {
 			}
 			tiles[tileKey] = tile
 		}
-		tile.Nodes[nodeKey(id.Level%8, id.Index%256)] = hash
+		tile.Nodes[api.TileNodeKey(id.Level%8, id.Index%256)] = hash
 	}
 
 	// look for new sequenced entries and build tree
@@ -112,13 +112,9 @@ func Integrate(st LogStorage, h hashers.LogHasher) error {
 	return nil
 }
 
-func nodeKey(level uint, index uint64) string {
-	return fmt.Sprintf("%d-%d", level, index)
-}
-
 func tileSize(t *api.Tile) uint64 {
 	for i := uint64(0); i < 256; i++ {
-		if t.Nodes[nodeKey(0, i)] == nil {
+		if t.Nodes[api.TileNodeKey(0, i)] == nil {
 			return i
 		}
 	}
