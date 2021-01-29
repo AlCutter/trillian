@@ -18,6 +18,7 @@ type LogStorage interface {
 	LogState() api.LogState
 	UpdateState(newState api.LogState) error
 	ScanSequenced(begin uint64, f func(seq uint64, entry []byte) error) (uint64, error)
+	Sequence(leafhash []byte, leaf []byte) error
 }
 
 // Integrate adds sequenced but not-yet-included entries into the tree state.

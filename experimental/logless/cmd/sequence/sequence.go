@@ -8,6 +8,7 @@ import (
 	"github.com/google/trillian/experimental/logless/internal/storage/fs"
 
 	"github.com/golang/glog"
+	"github.com/google/trillian/experimental/logless/internal/log"
 	"github.com/google/trillian/merkle/rfc6962/hasher"
 )
 
@@ -39,19 +40,22 @@ func main() {
 		glog.Exitf("Failed to glob entries %q: %q", *entries, err)
 	}
 
-	for _, fp := range toAdd {
-		entry, err := ioutil.ReadFile(fp)
-		if err != nil {
-			glog.Exitf("Failed to read entry file %q: %q", fp, err)
+	entries := make(chan log.Entry, 100)
+	go func() {
+		for _, fp := range toAdd {
+			entry, err := ioutil.ReadFile(fp)
+			if err != nil {
+				glog.Exitf("Failed to read entry file %q: %q", fp, err)
+			}
+			entries <- log.Entry{
+				LeafData: entry,
+				LeafHash: h.HashLeaf(entry),
+			}
 		}
-		lh := h.HashLeaf(entry)
+		close(entries)
+	}()
 
-		// ask storage to sequence
-		err = st.Sequence(lh, entry)
-		if err != nil {
-			glog.Exitf("Failed to sequence %q: %q", fp, err)
-		}
+	if err := log.Sequence(st, h, entries); err != nil {
+		glog.Exitf("Failed to sequence entries: %q", err)
 	}
-
-	// done.
 }
