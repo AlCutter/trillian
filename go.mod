@@ -6,12 +6,12 @@ require (
 	bitbucket.org/creachadair/shell v0.0.7
 	cloud.google.com/go/iam v0.1.1 // indirect
 	cloud.google.com/go/spanner v1.29.0
-	contrib.go.opencensus.io/exporter/stackdriver v0.13.10
+	contrib.go.opencensus.io/exporter/stackdriver v0.13.14
 	github.com/apache/beam/sdks/v2 v2.0.0-20211012030016-ef4364519c94
 	github.com/fullstorydev/grpcurl v1.8.6
 	github.com/go-redis/redis v6.15.9+incompatible
 	github.com/go-sql-driver/mysql v1.6.0
-	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
+	github.com/golang/glog v1.0.0
 	github.com/golang/mock v1.6.0
 	github.com/golang/protobuf v1.5.2
 	github.com/google/btree v1.0.1
@@ -29,12 +29,13 @@ require (
 	go.etcd.io/etcd/server/v3 v3.5.2
 	go.etcd.io/etcd/v3 v3.5.2
 	go.opencensus.io v0.23.0
-	golang.org/x/crypto v0.0.0-20201002170205-7f63de1d35b0
+	go.opentelemetry.io/otel/internal/metric v0.27.0 // indirect
+	golang.org/x/crypto v0.0.0-20211215153901-e495a2d5b3d3
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20220310020820-b874c991c1a5
-	golang.org/x/tools v0.1.9
-	google.golang.org/api v0.73.0
-	google.golang.org/genproto v0.0.0-20220310185008-1973136f34c6
+	golang.org/x/sys v0.0.0-20220328115105-d36c6a25d886
+	golang.org/x/tools v0.1.10
+	google.golang.org/api v0.74.0
+	google.golang.org/genproto v0.0.0-20220324131243-acbaeb5b85eb
 	google.golang.org/grpc v1.45.0
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.2.0
 	google.golang.org/protobuf v1.28.0
